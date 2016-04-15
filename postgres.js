@@ -31,6 +31,16 @@
     return select;
   };
 
+  Insert.prototype.conflict = function conflict() {
+    this._conflict = true;
+    return this;
+  };
+
+  Insert.prototype.doNothing = function doNothing() {
+    this._doNothing = true;
+    return this;
+  };
+
   Delete.prototype.using = function() {
     return this._addListArgs(arguments, '_using');
   };
@@ -42,6 +52,18 @@
   Delete.defineClause('returning', returning_tmpl, {after: 'where'});
 
   Delete.defineClause('using', '{{#if _using}}USING {{tables _using}}{{/if}}', {after: 'delete'});
+
+  Insert.defineClause('conflict','{{#if _conflict}}ON CONFLICT {{#if _doNothing}} DO NOTHING{{/if}}{{/if}}', {before: 'returning'});
+
+  function redefineClause(statement, clause_id, template, opts) {
+    // remove existing
+    statement.prototype.clauses.splice(statement.prototype.clauses.indexOf(clause_id), 1);
+    // reset
+    statement.defineClause(statement, clause_id, template);
+  }
+
+  // override sql-bricks default forUpdate, replacing NO WAIT with NOWAIT
+ Select.defineClause('forUpdate', '{{#if _forUpdate}}FOR UPDATE{{#if _of}} OF {{columns _of}}{{/if}}{{#if _noWait}} NOWAIT{{/if}}{{/if}}');
 
   // TODO: shouldn't LIMIT/OFFSET use handleValue()? Otherwise isn't it vulnerable to SQL Injection?
   Select.prototype.limit = function(val) {
@@ -74,7 +96,7 @@
   // ilike
   // --------------------------------------------------------
   pgsql.ilike = function (col, val, escape_char) {
-    return new ILike(col, val, escape_char); 
+    return new ILike(col, val, escape_char);
   };
 
   var ILike = sql.inherits(function ILike(col, val, escape_char) {
